@@ -1,0 +1,114 @@
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>有局 · 邀请</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      background: #f7f7f7;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 420px;
+      margin: 40px auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    h2 {
+      margin-top: 0;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+    .attend { background: #4CAF50; color: white; }
+    .maybe { background: #FF9800; color: white; }
+    .decline { background: #F44336; color: white; }
+    .result {
+      margin-top: 16px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2 id="title">加载中…</h2>
+    <p id="info"></p>
+
+    <button class="attend" onclick="send('attend')">一定来</button>
+    <button class="maybe" onclick="send('maybe')">在看看</button>
+    <button class="decline" onclick="send('decline')">下次吧</button>
+
+    <p class="result" id="result"></p>
+  </div>
+
+<script>
+/* ===== Supabase 配置 ===== */
+const SUPABASE_URL = "https://spkkuqgwrgqmxnfwkcii.supabase.co"
+const SUPABASE_KEY = "sb_publishable_5GS8OM7sn2D-2P3_itZnbg_4IVAY2ma"
+
+/* ===== 读取 URL 参数 ===== */
+const params = new URLSearchParams(window.location.search)
+const eventId = params.get("eventId")
+
+if (!eventId) {
+  document.getElementById("title").innerText = "链接无效"
+}
+
+/* ===== 拉取局信息（关键：必须有 select=*） ===== */
+fetch(`${SUPABASE_URL}/rest/v1/events?select=*&id=eq.${eventId}`, {
+  headers: {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`
+  }
+})
+.then(res => res.json())
+.then(data => {
+  if (!data || data.length === 0) {
+    document.getElementById("title").innerText = "未找到该局"
+    return
+  }
+
+  const e = data[0]
+  document.getElementById("title").innerText = e.title
+  document.getElementById("info").innerText =
+    `局头：${e.host_name} ｜ ${new Date(e.time).toLocaleString()}`
+})
+.catch(err => {
+  document.getElementById("title").innerText = "加载失败"
+  console.error(err)
+})
+
+/* ===== 提交反馈 ===== */
+function send(type) {
+  fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_KEY,
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      event_id: eventId,
+      response: type
+    })
+  }).then(() => {
+    document.getElementById("result").innerText = "已反馈，可以关闭页面"
+  })
+}
+</script>
+
+</body>
+</html>
