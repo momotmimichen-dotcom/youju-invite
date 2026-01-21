@@ -1,114 +1,223 @@
-
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <title>有局 · 邀请</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-      background: #f7f7f7;
-      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                   "Helvetica Neue", Arial, sans-serif;
+      background: #f5f5f7;
+      margin: 0;
+      padding: 16px;
+      color: #1c1c1e;
     }
+
     .card {
       background: #fff;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 20px;
-      max-width: 420px;
-      margin: 40px auto;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      max-width: 480px;
+      margin: 0 auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
     }
-    h2 {
+
+    h1 {
       margin-top: 0;
+      font-size: 22px;
     }
-    button {
+
+    .info {
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+      color: #333;
+    }
+
+    .info div {
+      margin-bottom: 4px;
+    }
+
+    .name-input {
+      margin: 16px 0 8px;
+    }
+
+    .name-input label {
+      font-size: 14px;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .name-input input {
       width: 100%;
-      padding: 12px;
-      margin-top: 12px;
+      padding: 10px 12px;
       font-size: 16px;
-      border-radius: 8px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #8e8e93;
+      margin-top: 4px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 16px;
+      border-radius: 12px;
       border: none;
       cursor: pointer;
     }
-    .attend { background: #4CAF50; color: white; }
-    .maybe { background: #FF9800; color: white; }
-    .decline { background: #F44336; color: white; }
-    .result {
-      margin-top: 16px;
-      color: #555;
+
+    .attend {
+      background: #007aff;
+      color: white;
+    }
+
+    .maybe {
+      background: #ffcc00;
+      color: #1c1c1e;
+    }
+
+    .decline {
+      background: #ff3b30;
+      color: white;
+    }
+
+    .status {
       text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+      color: #007aff;
     }
   </style>
 </head>
+
 <body>
-
   <div class="card">
-    <h2 id="title">加载中…</h2>
-    <p id="info"></p>
+    <h1 id="title">加载中…</h1>
 
-    <button class="attend" onclick="send('attend')">一定来</button>
-    <button class="maybe" onclick="send('maybe')">在看看</button>
-    <button class="decline" onclick="send('decline')">下次吧</button>
+    <div class="info" id="eventInfo"></div>
 
-    <p class="result" id="result"></p>
+    <!-- 名字输入（选填） -->
+    <div class="name-input">
+      <label>怎么称呼你？（选填）</label>
+      <input
+        type="text"
+        id="nameInput"
+        placeholder="昵称 / 名字都可以"
+      />
+      <div class="hint">仅对组局者可见</div>
+    </div>
+
+    <!-- 三个选择按钮 -->
+    <div class="buttons">
+      <button class="attend" onclick="sendResponse('attend')">一定到</button>
+      <button class="maybe" onclick="sendResponse('maybe')">没想好</button>
+      <button class="decline" onclick="sendResponse('decline')">下次吧</button>
+    </div>
+
+    <div class="status" id="status"></div>
   </div>
 
-<script>
-/* ===== Supabase 配置 ===== */
-const SUPABASE_URL = "https://spkkuqgwrgqmxnfwkcii.supabase.co"
-const SUPABASE_KEY = "sb_publishable_5GS8OM7sn2D-2P3_itZnbg_4IVAY2ma"
+  <script>
+    // ====== Supabase 配置（替换成你自己的） ======
+    const SUPABASE_URL = "https://spkkuqgwrgqmxnfwkcii.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_5GS8OM7sn2D-2P3_itZnbg_4IVAY2ma";
 
-/* ===== 读取 URL 参数 ===== */
-const params = new URLSearchParams(window.location.search)
-const eventId = params.get("eventId")
+    // ====== 获取 eventId ======
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get("eventId");
 
-if (!eventId) {
-  document.getElementById("title").innerText = "链接无效"
-}
+    const titleEl = document.getElementById("title");
+    const infoEl = document.getElementById("eventInfo");
+    const statusEl = document.getElementById("status");
 
-/* ===== 拉取局信息（关键：必须有 select=*） ===== */
-fetch(`${SUPABASE_URL}/rest/v1/events?select=*&id=eq.${eventId}`, {
-  headers: {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`
-  }
-})
-.then(res => res.json())
-.then(data => {
-  if (!data || data.length === 0) {
-    document.getElementById("title").innerText = "未找到该局"
-    return
-  }
+    if (!eventId) {
+      titleEl.innerText = "未找到该局";
+    } else {
+      loadEvent();
+    }
 
-  const e = data[0]
-  document.getElementById("title").innerText = e.title
-  document.getElementById("info").innerText =
-    `局头：${e.host_name} ｜ ${new Date(e.time).toLocaleString()}`
-})
-.catch(err => {
-  document.getElementById("title").innerText = "加载失败"
-  console.error(err)
-})
+    // ====== 加载局信息 ======
+    async function loadEvent() {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}`,
+        {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        }
+      );
 
-/* ===== 提交反馈 ===== */
-function send(type) {
-  fetch(`${SUPABASE_URL}/rest/v1/responses`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      event_id: eventId,
-      response: type
-    })
-  }).then(() => {
-    document.getElementById("result").innerText = "已反馈，可以关闭页面"
-  })
-}
-</script>
+      const data = await res.json();
 
+      if (!data || data.length === 0) {
+        titleEl.innerText = "未找到该局";
+        return;
+      }
+
+      const event = data[0];
+
+      titleEl.innerText = event.title;
+
+      infoEl.innerHTML = `
+        <div>局头：${event.host_name}</div>
+        <div>类型：${event.type}</div>
+        <div>时间：${new Date(event.time).toLocaleString("zh-CN", {
+          weekday: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+          month: "numeric",
+          day: "numeric"
+        })}</div>
+        <div>${event.drink_alcohol ? "可能饮酒" : "不饮酒"}</div>
+        <div>结算方式：${event.payment}</div>
+      `;
+    }
+
+    // ====== 发送反馈 ======
+    async function sendResponse(choice) {
+      if (!eventId) return;
+
+      const nameValue = document.getElementById("nameInput").value.trim();
+      const payload = {
+        event_id: eventId,
+        response: choice,
+        name: nameValue === "" ? null : nameValue,
+      };
+
+      statusEl.innerText = "发送中…";
+
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        statusEl.innerText = "已发送，感谢反馈";
+      } else {
+        statusEl.innerText = "发送失败，请重试";
+      }
+    }
+  </script>
 </body>
 </html>
