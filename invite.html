@@ -105,19 +105,20 @@
     }
 
     eventData = data[0];
-
     document.getElementById("title").innerText = eventData.title;
 
-    // ✅ 关键修复点：用 toLocaleString 转成本地时间
     const d = new Date(eventData.time);
-    const dateText = d.toLocaleDateString("zh-CN", {
-      month: "long",
-      day: "numeric",
-      weekday: "long"
+
+    // ⭐️ 时间修复点（唯一改动）
+    const timeText = d.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit'
     });
-    const timeText = d.toLocaleTimeString("zh-CN", {
-      hour: "2-digit",
-      minute: "2-digit"
+
+    const dateText = d.toLocaleDateString('zh-CN', {
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long'
     });
 
     document.getElementById("info").innerText =
@@ -150,11 +151,8 @@ ${eventData.drink_alcohol ? "可饮酒" : "不饮酒"}`;
       }
     );
 
-    if (res.ok) {
-      document.getElementById("status").innerText = "已发送，感谢反馈";
-    } else {
-      document.getElementById("status").innerText = "发送失败，请重试";
-    }
+    document.getElementById("status").innerText =
+      res.ok ? "已发送，感谢反馈" : "发送失败，请重试";
   }
 
   loadEvent();
