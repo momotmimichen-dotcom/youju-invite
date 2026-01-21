@@ -16,7 +16,7 @@
     }
 
     .card {
-      background: #fff;
+      background: #ffffff;
       border-radius: 16px;
       padding: 20px;
       max-width: 480px;
@@ -99,7 +99,7 @@
       text-align: center;
       margin-top: 20px;
       font-size: 14px;
-      color: #007aff;
+      white-space: pre-wrap;
     }
   </style>
 </head>
@@ -132,11 +132,11 @@
   </div>
 
   <script>
-    // ====== Supabase 配置（替换成你自己的） ======
+    // ===== Supabase 配置（确认与你项目一致）=====
     const SUPABASE_URL = "https://spkkuqgwrgqmxnfwkcii.supabase.co";
     const SUPABASE_KEY = "sb_publishable_5GS8OM7sn2D-2P3_itZnbg_4IVAY2ma";
 
-    // ====== 获取 eventId ======
+    // ===== 获取 eventId =====
     const params = new URLSearchParams(window.location.search);
     const eventId = params.get("eventId");
 
@@ -150,49 +150,55 @@
       loadEvent();
     }
 
-    // ====== 加载局信息 ======
+    // ===== 加载局信息 =====
     async function loadEvent() {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}`,
-        {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${SUPABASE_KEY}`,
-          },
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}`,
+          {
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+            },
+          }
+        );
+
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+          titleEl.innerText = "未找到该局";
+          return;
         }
-      );
 
-      const data = await res.json();
+        const event = data[0];
 
-      if (!data || data.length === 0) {
-        titleEl.innerText = "未找到该局";
-        return;
+        titleEl.innerText = event.title;
+
+        infoEl.innerHTML = `
+          <div>局头：${event.host_name}</div>
+          <div>聚会类型：${event.type}</div>
+          <div>时间：${new Date(event.time).toLocaleString("zh-CN", {
+            weekday: "long",
+            hour: "2-digit",
+            minute: "2-digit",
+            month: "numeric",
+            day: "numeric"
+          })}</div>
+          <div>${event.drink_alcohol ? "可能饮酒" : "不饮酒"}</div>
+          <div>结算方式：${event.payment}</div>
+        `;
+      } catch (err) {
+        titleEl.innerText = "加载失败";
+        statusEl.innerText = err.toString();
       }
-
-      const event = data[0];
-
-      titleEl.innerText = event.title;
-
-      infoEl.innerHTML = `
-        <div>局头：${event.host_name}</div>
-        <div>类型：${event.type}</div>
-        <div>时间：${new Date(event.time).toLocaleString("zh-CN", {
-          weekday: "long",
-          hour: "2-digit",
-          minute: "2-digit",
-          month: "numeric",
-          day: "numeric"
-        })}</div>
-        <div>${event.drink_alcohol ? "可能饮酒" : "不饮酒"}</div>
-        <div>结算方式：${event.payment}</div>
-      `;
     }
 
-    // ====== 发送反馈 ======
+    // ===== 发送反馈 =====
     async function sendResponse(choice) {
       if (!eventId) return;
 
       const nameValue = document.getElementById("nameInput").value.trim();
+
       const payload = {
         event_id: eventId,
         response: choice,
@@ -201,21 +207,28 @@
 
       statusEl.innerText = "发送中…";
 
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
 
-      if (res.ok) {
+        const text = await res.text();
+
+        if (!res.ok) {
+          statusEl.innerText = "发送失败：\n" + text;
+          return;
+        }
+
         statusEl.innerText = "已发送，感谢反馈";
-      } else {
-        statusEl.innerText = "发送失败，请重试";
+      } catch (err) {
+        statusEl.innerText = "网络错误：\n" + err.toString();
       }
     }
   </script>
