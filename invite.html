@@ -1,162 +1,237 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
   <title>有局 · 邀请</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                   "Helvetica Neue", Arial, sans-serif;
       background: #f5f5f7;
       margin: 0;
-      padding: 20px;
+      padding: 16px;
+      color: #1c1c1e;
     }
+
     .card {
-      background: white;
+      background: #ffffff;
       border-radius: 16px;
       padding: 20px;
-      max-width: 420px;
+      max-width: 480px;
       margin: 0 auto;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
     }
+
     h1 {
-      margin: 0 0 12px 0;
+      margin-top: 0;
       font-size: 22px;
     }
+
     .info {
-      color: #666;
       font-size: 14px;
       line-height: 1.6;
       margin-bottom: 16px;
+      color: #333;
     }
+
+    .info div {
+      margin-bottom: 4px;
+    }
+
     .name-input {
-      width: 100%;
-      padding: 10px;
-      font-size: 16px;
-      margin-bottom: 16px;
-      border-radius: 8px;
-      border: 1px solid #ddd;
+      margin: 16px 0 8px;
     }
-    .btn {
+
+    .name-input label {
+      font-size: 14px;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .name-input input {
       width: 100%;
-      padding: 14px;
+      padding: 10px 12px;
       font-size: 16px;
       border-radius: 10px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #8e8e93;
+      margin-top: 4px;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    button {
+      flex: 1;
+      padding: 12px 0;
+      font-size: 16px;
+      border-radius: 12px;
       border: none;
-      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .attend {
+      background: #007aff;
       color: white;
     }
-    .attend { background: #007aff; }
-    .maybe { background: #f5b400; }
-    .decline { background: #ff3b30; }
+
+    .maybe {
+      background: #ffcc00;
+      color: #1c1c1e;
+    }
+
+    .decline {
+      background: #ff3b30;
+      color: white;
+    }
+
     .status {
       text-align: center;
-      margin-top: 12px;
+      margin-top: 20px;
       font-size: 14px;
-      color: #666;
+      white-space: pre-wrap;
     }
   </style>
 </head>
+
 <body>
+  <div class="card">
+    <h1 id="title">加载中…</h1>
 
-<div class="card">
-  <h1 id="title">加载中…</h1>
+    <div class="info" id="eventInfo"></div>
 
-  <div class="info" id="info"></div>
+    <!-- 名字输入（选填） -->
+    <div class="name-input">
+      <label>怎么称呼你？（选填）</label>
+      <input
+        type="text"
+        id="nameInput"
+        placeholder="昵称 / 名字都可以"
+      />
+      <div class="hint">仅对组局者可见</div>
+    </div>
 
-  <input
-    class="name-input"
-    id="nameInput"
-    placeholder="你的名字（可选）"
-  />
+    <!-- 三个选择按钮 -->
+    <div class="buttons">
+      <button class="attend" onclick="sendResponse('attend')">一定到</button>
+      <button class="maybe" onclick="sendResponse('maybe')">没想好</button>
+      <button class="decline" onclick="sendResponse('decline')">下次吧</button>
+    </div>
 
-  <button class="btn attend" onclick="sendResponse('attend')">一定到</button>
-  <button class="btn maybe" onclick="sendResponse('maybe')">没想好</button>
-  <button class="btn decline" onclick="sendResponse('decline')">下次吧</button>
+    <div class="status" id="status"></div>
+  </div>
 
-  <div class="status" id="status"></div>
-</div>
+  <script>
+    // ===== Supabase 配置（确认与你项目一致）=====
+    const SUPABASE_URL = "https://spkkuqgwrgqmxnfwkcii.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_5GS8OM7sn2D-2P3_itZnbg_4IVAY2ma";
 
-<script>
-  const SUPABASE_URL = "https://spkkuqgwrgqmxnfwkcii.supabase.co";
-  const SUPABASE_KEY = "你的 publishable key";
+    // ===== 获取 eventId =====
+    const params = new URLSearchParams(window.location.search);
+    const eventId = params.get("eventId");
 
-  const params = new URLSearchParams(window.location.search);
-  const eventId = params.get("eventId");
+    const titleEl = document.getElementById("title");
+    const infoEl = document.getElementById("eventInfo");
+    const statusEl = document.getElementById("status");
 
-  let eventData = null;
-
-  async function loadEvent() {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}`,
-      {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`
-        }
-      }
-    );
-
-    const data = await res.json();
-
-    if (!data || data.length === 0) {
-      document.getElementById("title").innerText = "未找到该局";
-      return;
+    if (!eventId) {
+      titleEl.innerText = "未找到该局";
+    } else {
+      loadEvent();
     }
 
-    eventData = data[0];
-    document.getElementById("title").innerText = eventData.title;
+    // ===== 加载局信息 =====
+    async function loadEvent() {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/events?id=eq.${eventId}`,
+          {
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+            },
+          }
+        );
 
-    const d = new Date(eventData.time);
+        const data = await res.json();
 
-    // ⭐️ 时间修复点（唯一改动）
-    const timeText = d.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+        if (!data || data.length === 0) {
+          titleEl.innerText = "未找到该局";
+          return;
+        }
 
-    const dateText = d.toLocaleDateString('zh-CN', {
-      month: 'long',
-      day: 'numeric',
-      weekday: 'long'
-    });
+        const event = data[0];
 
-    document.getElementById("info").innerText =
-      `局头：${eventData.host_name}
-类型：${eventData.type}
-时间：${dateText} ${timeText}
-结算：${eventData.payment}
-${eventData.drink_alcohol ? "可饮酒" : "不饮酒"}`;
-  }
+        titleEl.innerText = event.title;
 
-  async function sendResponse(response) {
-    if (!eventData) return;
-
-    const name = document.getElementById("nameInput").value;
-
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/responses`,
-      {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${SUPABASE_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          event_id: eventData.id,
-          response,
-          name: name || null
-        })
+        infoEl.innerHTML = `
+          <div>局头：${event.host_name}</div>
+          <div>聚会类型：${event.type}</div>
+          <div>时间：${new Date(event.time+"Z").toLocaleString("zh-CN", {
+            weekday: "long",
+            hour: "2-digit",
+            minute: "2-digit",
+            month: "numeric",
+            day: "numeric"
+          })}</div>
+          <div>${event.drink_alcohol ? "可能饮酒" : "不饮酒"}</div>
+          <div>结算方式：${event.payment}</div>
+        `;
+      } catch (err) {
+        titleEl.innerText = "加载失败";
+        statusEl.innerText = err.toString();
       }
-    );
+    }
 
-    document.getElementById("status").innerText =
-      res.ok ? "已发送，感谢反馈" : "发送失败，请重试";
-  }
+    // ===== 发送反馈 =====
+    async function sendResponse(choice) {
+      if (!eventId) return;
 
-  loadEvent();
-</script>
+      const nameValue = document.getElementById("nameInput").value.trim();
 
+      const payload = {
+        event_id: eventId,
+        response: choice,
+        name: nameValue === "" ? null : nameValue,
+      };
+
+      statusEl.innerText = "发送中…";
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/responses`, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const text = await res.text();
+
+        if (!res.ok) {
+          statusEl.innerText = "发送失败：\n" + text;
+          return;
+        }
+
+        statusEl.innerText = "已发送，感谢反馈";
+      } catch (err) {
+        statusEl.innerText = "网络错误：\n" + err.toString();
+      }
+    }
+  </script>
 </body>
 </html>
